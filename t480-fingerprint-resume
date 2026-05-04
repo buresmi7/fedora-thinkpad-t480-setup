@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+set -u
+
+if [ "${1:-}" != "post" ]; then
+  exit 0
+fi
+
+logger -t t480-fingerprint-resume "post-resume recovery started"
+
+for _ in 1 2 3 4 5; do
+  if lsusb -d 06cb:009a >/dev/null 2>&1; then
+    logger -t t480-fingerprint-resume "fingerprint USB device is present"
+    break
+  fi
+  sleep 1
+done
+
+udevadm settle --timeout=5 >/dev/null 2>&1 || true
+systemctl restart python3-validity.service >/dev/null 2>&1 || true
+sleep 1
+systemctl restart open-fprintd.service >/dev/null 2>&1 || true
+sleep 1
+target_user="$(awk -F: '$3 >= 1000 && $3 < 60000 && $1 != "nobody" {print $1; exit}' /etc/passwd)"
+if [ -n "$target_user" ]; then
+  fprintd-list "$target_user" >/dev/null 2>&1 || true
+fi
+
+logger -t t480-fingerprint-resume "post-resume recovery finished"
