@@ -31,15 +31,27 @@ install_temperature_indicator() {
   fi
 
   section "Installing CPU temperature indicator"
-  run dnf install -y lm_sensors gnome-shell-extension-freon
+  run dnf install -y lm_sensors gnome-shell-extension-freon gnome-extensions-app
 
-  log "Running sensors-detect. Default answers are usually safe."
-  run_tolerate sensors-detect
+  log "Running sensors-detect with automatic safe defaults."
+  run_tolerate sensors-detect --auto
 
   log "Available sensors:"
   run_tolerate sensors
 
-  detected_uuid="$(rpm -ql gnome-shell-extension-freon 2>/dev/null | awk -F/ '/\/usr\/share\/gnome-shell\/extensions\/freon@/ {print $NF; exit}' || true)"
+  detected_uuid="$(
+    rpm -ql gnome-shell-extension-freon 2>/dev/null |
+      awk -F/ '
+        /\/usr\/share\/gnome-shell\/extensions\/freon@/ {
+          for (idx = 1; idx <= NF; idx++) {
+            if ($idx ~ /^freon@/) {
+              print $idx
+              exit
+            }
+          }
+        }
+      ' || true
+  )"
   if [ -n "$detected_uuid" ]; then
     freon_uuid="$detected_uuid"
   fi
@@ -47,10 +59,13 @@ install_temperature_indicator() {
   log "Freon GNOME Shell extension UUID: $freon_uuid"
   if [ -n "$REAL_USER" ]; then
     run_as_real_user gnome-extensions enable "$freon_uuid"
+    run_as_real_user gnome-extensions info "$freon_uuid"
   else
     log "No non-root SUDO_USER detected; enable Freon manually:"
     log "  gnome-extensions enable '$freon_uuid'"
   fi
+
+  log "If the temperature is still not visible, log out and back in, then check the Extensions app."
 }
 
 install_external_monitor_brightness() {

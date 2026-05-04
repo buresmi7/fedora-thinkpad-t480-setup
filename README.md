@@ -41,6 +41,14 @@ sudo ./scripts/power.sh --dry-run
 sudo ./scripts/health.sh
 ```
 
+Re-run only the GNOME desktop setup, including the CPU temperature indicator:
+
+```bash
+sudo ./scripts/desktop.sh
+```
+
+If the Freon temperature indicator does not appear immediately, log out and back in, then check it in the GNOME Extensions app.
+
 ## Layout
 
 - `setup.sh` - interactive/selective wrapper.
