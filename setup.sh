@@ -6,7 +6,7 @@
 #   power.sh       Fedora power profiles and ThinkPad battery thresholds
 #   fingerprint.sh Fingerprint authentication, python-validity, suspend/resume fix
 #   desktop.sh     GNOME/touchpad/temperature/DDC settings
-#   apps.sh        1Password, Bitwarden, GitHub CLI, Visual Studio Code
+#   apps.sh        1Password, Bitwarden, Slack, GitHub CLI, Visual Studio Code, Zed
 #   health.sh      Read-only health report and follow-up notes
 #
 # Fingerprint setup is based on:
@@ -57,7 +57,7 @@ readonly MODULE_LABELS=(
   "power management and battery thresholds"
   "fingerprint authentication and suspend/resume recovery"
   "GNOME desktop, touchpad, temperature indicator, DDC brightness"
-  "desktop apps: 1Password, Bitwarden, GitHub CLI, VS Code"
+  "desktop apps: 1Password, Bitwarden, Slack, GitHub CLI, VS Code, Zed"
   "health report and manual follow-up"
 )
 
