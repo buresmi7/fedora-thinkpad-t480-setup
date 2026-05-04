@@ -22,6 +22,9 @@ print_health_report() {
   run_as_real_user docker version
   run_as_real_user docker compose version
   run_as_real_user docker context ls
+  run_tolerate command -v code
+  run_as_real_user sh -c 'test -x "$HOME/.local/bin/zed" && "$HOME/.local/bin/zed" --version'
+  run_as_real_user bash -lc 'export NVM_DIR="$HOME/.nvm"; [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"; node --version; npm --version'
   run_tolerate bash -c 'cat /sys/class/power_supply/BAT*/charge_control_*_threshold'
 }
 

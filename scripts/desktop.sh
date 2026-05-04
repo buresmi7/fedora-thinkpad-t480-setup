@@ -16,6 +16,7 @@ setup_gnome_touchpad() {
     return 0
   fi
 
+  run dnf install -y glib2 gsettings-desktop-schemas
   run_as_real_user gsettings set org.gnome.desktop.peripherals.touchpad tap-to-click true
   run_as_real_user gsettings set org.gnome.desktop.peripherals.touchpad two-finger-scrolling-enabled true
   run_as_real_user gsettings set org.gnome.desktop.peripherals.touchpad natural-scroll false

@@ -82,7 +82,7 @@ setup_fingerprint_auth() {
   section "Fingerprint authentication"
   log "Fingerprint setup is based on: https://gist.github.com/borcean/f32c47f6cc52cee33dfc2265ce63f777"
 
-  run dnf install -y fprintd fprintd-pam
+  run dnf install -y authselect fprintd fprintd-pam usbutils
   log "Fingerprint USB detection:"
   fp_lines="$(fingerprint_usb_lines)"
   log "${fp_lines:-No fingerprint-like USB device detected by lsusb grep.}"

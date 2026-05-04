@@ -13,17 +13,20 @@ Modular Fedora post-install setup for Lenovo ThinkPad T480.
 - Synaptics fingerprint setup for the T480, including `open-fprintd`, `python-validity`, PAM/authselect, enrollment, and suspend/resume recovery.
 - GNOME touchpad defaults, CPU temperature indicator, and DDC/CI external monitor brightness tooling.
 - Official Docker Engine with Buildx, Docker Compose plugin, and a rootless per-user Docker daemon.
-- Desktop apps: 1Password, Bitwarden, Slack, GitHub CLI, Visual Studio Code, and Zed.
+- Desktop apps: 1Password, Bitwarden, and Slack.
+- Developer tools: GitHub CLI, AWS CLI v2, Visual Studio Code, Zed, nvm, and the latest Node.js LTS installed through nvm.
 
 1Password and Bitwarden are installed as RPM packages instead of Flatpaks. The RPM builds integrate better with the host system, especially for desktop/browser-extension communication and related browser plugin workflows.
 
 Slack is installed from Slack's RPM repository so updates are handled by DNF. The package signature is checked with Slack's current RPM signing key.
 
+Docker is installed from Docker's official Fedora RPM repository. The setup uses rootless mode for the target `sudo` user, leaves the system-wide rootful Docker service disabled, enables user lingering, and starts `docker.service` through the user's systemd instance. Compose is installed as the modern Docker CLI plugin and is used as `docker compose`.
+
 Visual Studio Code setup raises `fs.inotify.max_user_watches` to `524288` via `/etc/sysctl.d/99-vscode-inotify.conf` for large workspaces.
 
-Zed is installed for the target desktop user with the official Linux installer from `zed.dev`, which places it under `~/.local`.
+Zed is installed for the target desktop user with the official Linux installer from `zed.dev`, which places it under `~/.local`. nvm is installed for the target desktop user and then used to install the latest Node.js LTS release; new shells use that LTS release as the default.
 
-Docker is installed from Docker's official Fedora RPM repository. The setup uses rootless mode for the target `sudo` user, leaves the system-wide rootful Docker service disabled, enables user lingering, and starts `docker.service` through the user's systemd instance. Compose is installed as the modern Docker CLI plugin and is used as `docker compose`.
+AWS CLI v2 is installed or updated from the official AWS Linux ZIP installer.
 
 ## Usage
 
@@ -39,6 +42,7 @@ Run selected modules through the wrapper:
 sudo ./setup.sh --only fingerprint
 sudo ./setup.sh --only baseline,power,fingerprint
 sudo ./setup.sh --only docker
+sudo ./setup.sh --only dev
 sudo ./setup.sh --all
 sudo ./setup.sh --dry-run --only desktop
 ```
@@ -48,6 +52,7 @@ Run a module directly:
 ```bash
 sudo ./scripts/fingerprint.sh
 sudo ./scripts/docker.sh
+sudo ./scripts/dev.sh
 sudo ./scripts/power.sh --dry-run
 sudo ./scripts/health.sh
 ```

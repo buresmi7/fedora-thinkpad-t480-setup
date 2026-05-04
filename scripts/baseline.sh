@@ -20,17 +20,9 @@ readonly BASELINE_PACKAGES=(
   htop
   btop
   fastfetch
-  lm_sensors
   pciutils
   usbutils
   util-linux-user
-  upower
-  fwupd
-  bolt
-  libva-utils
-  libva-intel-media-driver
-  ddcutil
-  i2c-tools
 )
 
 install_baseline_packages() {
@@ -40,6 +32,7 @@ install_baseline_packages() {
 
 setup_firmware_fwupd() {
   section "Firmware via fwupd"
+  run dnf install -y fwupd
   run systemctl enable --now fwupd-refresh.timer
   run_tolerate fwupdmgr refresh --force
   run_tolerate fwupdmgr get-updates
@@ -53,6 +46,7 @@ setup_firmware_fwupd() {
 
 setup_thunderbolt_bolt() {
   section "Thunderbolt / USB-C dock support"
+  run dnf install -y bolt
   run systemctl enable --now bolt
   run_tolerate boltctl
 }
