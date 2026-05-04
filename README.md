@@ -2,6 +2,20 @@
 
 Modular Fedora post-install setup for Lenovo ThinkPad T480.
 
+## Features
+
+- Baseline Fedora tools and ThinkPad diagnostics.
+- Firmware updates through `fwupd`.
+- Thunderbolt / USB-C dock support through `bolt`.
+- RPM Fusion multimedia and browser video acceleration setup.
+- Fedora-native power management through `tuned` / `tuned-ppd`.
+- ThinkPad battery charge thresholds without TLP.
+- Synaptics fingerprint setup for the T480, including `open-fprintd`, `python-validity`, PAM/authselect, enrollment, and suspend/resume recovery.
+- GNOME touchpad defaults, CPU temperature indicator, and DDC/CI external monitor brightness tooling.
+- Desktop apps: 1Password, Bitwarden, GitHub CLI, and Visual Studio Code.
+
+1Password and Bitwarden are installed as RPM packages instead of Flatpaks. The RPM builds integrate better with the host system, especially for desktop/browser-extension communication and related browser plugin workflows.
+
 ## Usage
 
 Run the interactive wrapper:
