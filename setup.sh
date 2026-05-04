@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Fedora post-install setup for Lenovo ThinkPad T480.
 #
-# The setup is split into small modules under ./modules:
+# The setup is split into standalone scripts under ./scripts:
 #   baseline.sh    Base packages, firmware, Thunderbolt, RPM Fusion, browser codecs
 #   power.sh       Fedora power profiles and ThinkPad battery thresholds
 #   fingerprint.sh Fingerprint authentication, python-validity, suspend/resume fix
@@ -13,16 +13,20 @@
 #   https://gist.github.com/borcean/f32c47f6cc52cee33dfc2265ce63f777
 #
 # Usage:
-#   sudo ./t480-live-test-with-fingerprint.sh
-#   sudo ./t480-live-test-with-fingerprint.sh --only fingerprint
-#   sudo ./t480-live-test-with-fingerprint.sh --only baseline,power,fingerprint
-#   sudo ./t480-live-test-with-fingerprint.sh --yes --only fingerprint
-#   sudo ./t480-live-test-with-fingerprint.sh --dry-run --all
+#   sudo ./setup.sh
+#   sudo ./setup.sh --only fingerprint
+#   sudo ./setup.sh --only baseline,power,fingerprint
+#   sudo ./setup.sh --yes --only fingerprint
+#   sudo ./setup.sh --dry-run --all
+#
+# Each module can also run directly:
+#   sudo ./scripts/fingerprint.sh --yes
 
 set -Eeuo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SCRIPT_NAME="$(basename "$0")"
+PROJECT_DIR="$SCRIPT_DIR"
 
 ASSUME_YES=0
 DRY_RUN=0
@@ -34,18 +38,18 @@ FEDORA_VERSION=""
 
 # shellcheck source=lib/common.sh
 source "$SCRIPT_DIR/lib/common.sh"
-# shellcheck source=modules/baseline.sh
-source "$SCRIPT_DIR/modules/baseline.sh"
-# shellcheck source=modules/power.sh
-source "$SCRIPT_DIR/modules/power.sh"
-# shellcheck source=modules/fingerprint.sh
-source "$SCRIPT_DIR/modules/fingerprint.sh"
-# shellcheck source=modules/desktop.sh
-source "$SCRIPT_DIR/modules/desktop.sh"
-# shellcheck source=modules/apps.sh
-source "$SCRIPT_DIR/modules/apps.sh"
-# shellcheck source=modules/health.sh
-source "$SCRIPT_DIR/modules/health.sh"
+# shellcheck source=scripts/baseline.sh
+source "$SCRIPT_DIR/scripts/baseline.sh"
+# shellcheck source=scripts/power.sh
+source "$SCRIPT_DIR/scripts/power.sh"
+# shellcheck source=scripts/fingerprint.sh
+source "$SCRIPT_DIR/scripts/fingerprint.sh"
+# shellcheck source=scripts/desktop.sh
+source "$SCRIPT_DIR/scripts/desktop.sh"
+# shellcheck source=scripts/apps.sh
+source "$SCRIPT_DIR/scripts/apps.sh"
+# shellcheck source=scripts/health.sh
+source "$SCRIPT_DIR/scripts/health.sh"
 
 readonly MODULE_IDS=(baseline power fingerprint desktop apps health)
 readonly MODULE_LABELS=(
@@ -74,6 +78,10 @@ Options:
 T480 fingerprint BIOS prerequisite:
   Security -> Fingerprint -> Predesktop Authentication -> Disabled
   Then do a full shutdown, wait a few seconds, and boot again.
+
+Standalone modules:
+  sudo ./scripts/fingerprint.sh
+  sudo ./scripts/power.sh --dry-run
 EOF
 }
 

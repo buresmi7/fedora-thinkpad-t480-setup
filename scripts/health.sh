@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+set -Eeuo pipefail
+
+MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+: "${PROJECT_DIR:=$(cd "$MODULE_DIR/.." && pwd)}"
+
+if [ -z "${T480_COMMON_LOADED:-}" ]; then
+  # shellcheck source=../lib/common.sh
+  source "$PROJECT_DIR/lib/common.sh"
+fi
 
 print_health_report() {
   section "Health report"
@@ -27,3 +36,7 @@ run_health_module() {
   print_health_report
   print_manual_followup
 }
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  standalone_main health run_health_module "$@"
+fi

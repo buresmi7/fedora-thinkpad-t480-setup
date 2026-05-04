@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+set -Eeuo pipefail
+
+MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+: "${PROJECT_DIR:=$(cd "$MODULE_DIR/.." && pwd)}"
+
+if [ -z "${T480_COMMON_LOADED:-}" ]; then
+  # shellcheck source=../lib/common.sh
+  source "$PROJECT_DIR/lib/common.sh"
+fi
 
 readonly BASELINE_PACKAGES=(
   curl
@@ -88,3 +97,7 @@ run_baseline_module() {
   setup_rpmfusion_multimedia
   install_browser_acceleration
 }
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  standalone_main baseline run_baseline_module "$@"
+fi

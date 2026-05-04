@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+set -Eeuo pipefail
+
+MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+: "${PROJECT_DIR:=$(cd "$MODULE_DIR/.." && pwd)}"
+
+if [ -z "${T480_COMMON_LOADED:-}" ]; then
+  # shellcheck source=../lib/common.sh
+  source "$PROJECT_DIR/lib/common.sh"
+fi
 
 setup_gnome_touchpad() {
   section "GNOME touchpad settings"
@@ -72,3 +81,7 @@ run_desktop_module() {
   install_temperature_indicator
   install_external_monitor_brightness
 }
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  standalone_main desktop run_desktop_module "$@"
+fi

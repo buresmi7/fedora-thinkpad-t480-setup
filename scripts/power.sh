@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+set -Eeuo pipefail
+
+MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+: "${PROJECT_DIR:=$(cd "$MODULE_DIR/.." && pwd)}"
+
+if [ -z "${T480_COMMON_LOADED:-}" ]; then
+  # shellcheck source=../lib/common.sh
+  source "$PROJECT_DIR/lib/common.sh"
+fi
 
 install_fedora_power_management() {
   section "Fedora-native power management"
@@ -88,3 +97,7 @@ run_power_module() {
   install_fedora_power_management
   configure_thinkpad_battery_thresholds
 }
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  standalone_main power run_power_module "$@"
+fi

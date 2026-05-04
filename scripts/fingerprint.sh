@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+set -Eeuo pipefail
+
+MODULE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+: "${PROJECT_DIR:=$(cd "$MODULE_DIR/.." && pwd)}"
+
+if [ -z "${T480_COMMON_LOADED:-}" ]; then
+  # shellcheck source=../lib/common.sh
+  source "$PROJECT_DIR/lib/common.sh"
+fi
 
 readonly T480_FINGERPRINT_USB_ID="06cb:009a"
 readonly PYTHON_VALIDITY_COPR="sneexy/python-validity"
@@ -9,48 +18,15 @@ fingerprint_usb_lines() {
 
 write_fingerprint_resume_hook() {
   local path="/usr/lib/systemd/system-sleep/t480-fingerprint-resume"
+  local source_path="$PROJECT_DIR/assets/t480-fingerprint-resume"
 
   if [ "$DRY_RUN" -eq 1 ]; then
-    log "Dry-run: would write fingerprint resume hook to $path"
+    log "Dry-run: would install fingerprint resume hook from $source_path to $path"
     return 0
   fi
 
   run mkdir -p /usr/lib/systemd/system-sleep
-  cat > "$path" <<'EOF'
-#!/usr/bin/env bash
-set -u
-
-if [ "${1:-}" != "post" ]; then
-  exit 0
-fi
-
-logger -t t480-fingerprint-resume "post-resume recovery started"
-
-# Suspend/resume workaround for the T480 Synaptics 06cb:009a reader.
-# systemd-sleep on Fedora 44 runs hooks from /usr/lib/systemd/system-sleep
-# while user.slice is still frozen. Doing recovery here prevents GNOME Shell
-# from building the unlock prompt before open-fprintd/python-validity are ready.
-for _ in 1 2 3 4 5; do
-  if lsusb -d 06cb:009a >/dev/null 2>&1; then
-    logger -t t480-fingerprint-resume "fingerprint USB device is present"
-    break
-  fi
-  sleep 1
-done
-
-udevadm settle --timeout=5 >/dev/null 2>&1 || true
-systemctl restart python3-validity.service >/dev/null 2>&1 || true
-sleep 1
-systemctl restart open-fprintd.service >/dev/null 2>&1 || true
-sleep 1
-target_user="$(awk -F: '$3 >= 1000 && $3 < 60000 && $1 != "nobody" {print $1; exit}' /etc/passwd)"
-if [ -n "$target_user" ]; then
-  fprintd-list "$target_user" >/dev/null 2>&1 || true
-fi
-
-logger -t t480-fingerprint-resume "post-resume recovery finished"
-EOF
-  run chmod +x "$path"
+  run install -m 0755 "$source_path" "$path"
   run_tolerate chown root:root /usr/lib/systemd/system-sleep "$path"
   if command -v restorecon >/dev/null 2>&1; then
     run_tolerate restorecon -F /usr/lib/systemd/system-sleep "$path"
@@ -141,3 +117,7 @@ setup_fingerprint_auth() {
 run_fingerprint_module() {
   setup_fingerprint_auth
 }
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+  standalone_main fingerprint run_fingerprint_module "$@"
+fi

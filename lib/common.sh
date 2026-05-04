@@ -5,6 +5,7 @@
 : "${REAL_USER:=${SUDO_USER:-}}"
 : "${REAL_HOME:=}"
 : "${FEDORA_VERSION:=}"
+T480_COMMON_LOADED=1
 
 log() {
   printf '%b\n' "$*"
@@ -104,4 +105,58 @@ print_header() {
   log "Real user: ${REAL_USER:-not detected}"
   log "Dry run: $DRY_RUN"
   log "Assume yes: $ASSUME_YES"
+}
+
+standalone_usage() {
+  local module="$1"
+
+  cat <<EOF
+Usage: sudo ./scripts/$module.sh [options]
+
+Run the ThinkPad T480 '$module' setup module directly.
+
+Options:
+  -y, --yes      Auto-confirm prompts.
+  -n, --dry-run  Print commands without executing them.
+  -h, --help     Show this help.
+EOF
+}
+
+parse_standalone_args() {
+  local module="$1"
+  shift
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -y|--yes)
+        ASSUME_YES=1
+        ;;
+      -n|--dry-run)
+        DRY_RUN=1
+        ;;
+      -h|--help)
+        standalone_usage "$module"
+        exit 0
+        ;;
+      *)
+        log "Unknown option: $1" >&2
+        standalone_usage "$module"
+        exit 2
+        ;;
+    esac
+    shift
+  done
+}
+
+standalone_main() {
+  local module="$1"
+  local runner="$2"
+  shift 2
+
+  parse_standalone_args "$module" "$@"
+  require_root
+  require_fedora
+  detect_real_user
+  print_header
+  "$runner"
 }
