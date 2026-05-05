@@ -13,12 +13,14 @@ Modular Fedora post-install setup for Lenovo ThinkPad T480.
 - Synaptics fingerprint setup for the T480, including `open-fprintd`, `python-validity`, PAM/authselect, enrollment, and suspend/resume recovery.
 - GNOME touchpad defaults, CPU temperature indicator, and DDC/CI external monitor brightness tooling.
 - Official Docker Engine with Buildx, Docker Compose plugin, and a rootless per-user Docker daemon.
-- Desktop apps: 1Password, Bitwarden, and Slack.
+- Desktop apps: 1Password, Bitwarden, Google Chrome, and Slack.
 - Developer tools: GitHub CLI, AWS CLI v2, Visual Studio Code, Zed, nvm, and the latest Node.js LTS installed through nvm.
 
 1Password and Bitwarden are installed as RPM packages instead of Flatpaks. The RPM builds integrate better with the host system, especially for desktop/browser-extension communication and related browser plugin workflows.
 
 Slack is installed from Slack's RPM repository so updates are handled by DNF. The package signature is checked with Slack's current RPM signing key.
+
+Google Chrome is installed from Google's official RPM repository so updates are handled by DNF. The package signature is checked with Google's Linux signing key.
 
 Docker is installed from Docker's official Fedora RPM repository. The setup uses rootless mode for the target `sudo` user, leaves the system-wide rootful Docker service disabled, enables user lingering, and starts `docker.service` through the user's systemd instance. Compose is installed as the modern Docker CLI plugin and is used as `docker compose`.
 

@@ -7,7 +7,7 @@
 #   fingerprint.sh Fingerprint authentication, python-validity, suspend/resume fix
 #   desktop.sh     GNOME/touchpad/temperature/DDC settings
 #   docker.sh      Docker Engine, Docker Compose plugin, rootless user daemon
-#   apps.sh        1Password, Bitwarden, Slack
+#   apps.sh        1Password, Bitwarden, Google Chrome, Slack
 #   dev.sh         GitHub CLI, AWS CLI v2, Visual Studio Code, Zed, nvm, latest Node.js LTS
 #   health.sh      Read-only health report and follow-up notes
 #
@@ -66,7 +66,7 @@ readonly MODULE_LABELS=(
   "fingerprint authentication and suspend/resume recovery"
   "GNOME desktop, touchpad, temperature indicator, DDC brightness"
   "Docker Engine, Docker Compose plugin, and rootless user daemon"
-  "desktop apps: 1Password, Bitwarden, Slack"
+  "desktop apps: 1Password, Bitwarden, Google Chrome, Slack"
   "developer tools: GitHub CLI, AWS CLI v2, Visual Studio Code, Zed, nvm, latest Node.js LTS"
   "health report and manual follow-up"
 )

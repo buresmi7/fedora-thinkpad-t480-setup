@@ -58,6 +58,39 @@ install_bitwarden() {
   run_tolerate command -v bitwarden
 }
 
+write_google_chrome_repo() {
+  local path="/etc/yum.repos.d/google-chrome.repo"
+
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "Dry-run: would write Google Chrome RPM repository to $path"
+    return 0
+  fi
+
+  cat > "$path" <<'EOF'
+[google-chrome]
+name=google-chrome
+baseurl=https://dl.google.com/linux/chrome/rpm/stable/$basearch
+enabled=1
+gpgcheck=1
+gpgkey=https://dl.google.com/linux/linux_signing_key.pub
+EOF
+}
+
+install_google_chrome() {
+  section "Google Chrome"
+  if ! confirm "Install Google Chrome from the official Google RPM repository?"; then
+    log "Google Chrome setup skipped."
+    return 0
+  fi
+
+  run rpm --import https://dl.google.com/linux/linux_signing_key.pub
+  write_google_chrome_repo
+  run dnf makecache -y --disablerepo='*' --enablerepo=google-chrome
+  run dnf install -y google-chrome-stable
+  run_tolerate rpm -q google-chrome-stable
+  run_tolerate command -v google-chrome-stable
+}
+
 write_slack_repo() {
   local path="/etc/yum.repos.d/slack.repo"
 
@@ -97,6 +130,7 @@ install_slack() {
 run_apps_module() {
   install_1password
   install_bitwarden
+  install_google_chrome
   install_slack
 }
 
