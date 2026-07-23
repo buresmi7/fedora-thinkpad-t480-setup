@@ -12,6 +12,7 @@ Modular Fedora post-install setup for Lenovo ThinkPad T480.
 - ThinkPad battery charge thresholds without TLP.
 - Synaptics fingerprint setup for the T480, including `open-fprintd`, `python-validity`, PAM/authselect, enrollment, and suspend/resume recovery.
 - GNOME touchpad defaults, CPU temperature indicator, and DDC/CI external monitor brightness tooling.
+- Network preference service that disables Wi-Fi while wired Ethernet is connected, then re-enables Wi-Fi when the cable is unplugged.
 - Official Docker Engine with Buildx, Docker Compose plugin, and a rootless per-user Docker daemon.
 - Desktop apps: 1Password, Bitwarden, Google Chrome, and Slack.
 - Developer tools: GitHub CLI, AWS CLI v2, Visual Studio Code, Zed, nvm, and the latest Node.js LTS installed through nvm.
@@ -44,6 +45,7 @@ Run selected modules through the wrapper:
 sudo ./setup.sh --only fingerprint
 sudo ./setup.sh --only baseline,power,fingerprint
 sudo ./setup.sh --only docker
+sudo ./setup.sh --only network
 sudo ./setup.sh --only dev
 sudo ./setup.sh --all
 sudo ./setup.sh --dry-run --only desktop
@@ -56,6 +58,7 @@ sudo ./scripts/fingerprint.sh
 sudo ./scripts/docker.sh
 sudo ./scripts/dev.sh
 sudo ./scripts/power.sh --dry-run
+sudo ./scripts/network.sh
 sudo ./scripts/health.sh
 ```
 
@@ -73,5 +76,10 @@ If the Freon temperature indicator does not appear immediately, log out and back
 - `scripts/*.sh` - standalone setup scripts, each with one responsibility.
 - `lib/common.sh` - shared shell helpers.
 - `assets/t480-fingerprint-resume` - systemd sleep hook template installed by `scripts/fingerprint.sh`.
+- `assets/prefer-wired-network*` - user service files installed by `scripts/network.sh`.
 
 The fingerprint suspend/resume hook is not meant to be run manually. It is copied to `/usr/lib/systemd/system-sleep/t480-fingerprint-resume`.
+
+## Network Note
+
+On systems where Ethernet and Wi-Fi are connected to the same LAN, NetworkManager can report address conflicts and long-lived SSH/Git sessions can stall or time out. The `network` module installs a user systemd service that prefers the detected wired Ethernet device and turns Wi-Fi back on only when the cable is disconnected.

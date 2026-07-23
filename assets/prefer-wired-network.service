@@ -1,0 +1,14 @@
+[Unit]
+Description=Prefer wired network over Wi-Fi
+After=default.target
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/prefer-wired-network.env
+Environment=PREFER_WIRED_INTERVAL_SECONDS=5
+ExecStart=%h/.local/bin/prefer-wired-network
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target

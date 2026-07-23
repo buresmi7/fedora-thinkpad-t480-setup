@@ -6,6 +6,7 @@
 #   power.sh       Fedora power profiles and ThinkPad battery thresholds
 #   fingerprint.sh Fingerprint authentication, python-validity, suspend/resume fix
 #   desktop.sh     GNOME/touchpad/temperature/DDC settings
+#   network.sh     Prefer wired Ethernet over Wi-Fi on the same LAN
 #   docker.sh      Docker Engine, Docker Compose plugin, rootless user daemon
 #   apps.sh        1Password, Bitwarden, Google Chrome, Slack
 #   dev.sh         GitHub CLI, AWS CLI v2, Visual Studio Code, Zed, nvm, latest Node.js LTS
@@ -18,6 +19,7 @@
 #   sudo ./setup.sh
 #   sudo ./setup.sh --only fingerprint
 #   sudo ./setup.sh --only baseline,power,fingerprint
+#   sudo ./setup.sh --only network
 #   sudo ./setup.sh --yes --only fingerprint
 #   sudo ./setup.sh --dry-run --all
 #
@@ -50,6 +52,8 @@ source "$SCRIPT_DIR/scripts/power.sh"
 source "$SCRIPT_DIR/scripts/fingerprint.sh"
 # shellcheck source=scripts/desktop.sh
 source "$SCRIPT_DIR/scripts/desktop.sh"
+# shellcheck source=scripts/network.sh
+source "$SCRIPT_DIR/scripts/network.sh"
 # shellcheck source=scripts/docker.sh
 source "$SCRIPT_DIR/scripts/docker.sh"
 # shellcheck source=scripts/apps.sh
@@ -59,12 +63,13 @@ source "$SCRIPT_DIR/scripts/dev.sh"
 # shellcheck source=scripts/health.sh
 source "$SCRIPT_DIR/scripts/health.sh"
 
-readonly MODULE_IDS=(baseline power fingerprint desktop docker apps dev health)
+readonly MODULE_IDS=(baseline power fingerprint desktop network docker apps dev health)
 readonly MODULE_LABELS=(
   "baseline packages, firmware, Thunderbolt, RPM Fusion, browser codecs"
   "power management and battery thresholds"
   "fingerprint authentication and suspend/resume recovery"
   "GNOME desktop, touchpad, temperature indicator, DDC brightness"
+  "network preference: wired Ethernet over Wi-Fi on the same LAN"
   "Docker Engine, Docker Compose plugin, and rootless user daemon"
   "desktop apps: 1Password, Bitwarden, Google Chrome, Slack"
   "developer tools: GitHub CLI, AWS CLI v2, Visual Studio Code, Zed, nvm, latest Node.js LTS"
@@ -82,7 +87,7 @@ Options:
   -n, --dry-run         Print commands without executing them.
       --all             Run all modules.
       --only LIST       Run selected modules, comma-separated.
-                         Available: baseline,power,fingerprint,desktop,docker,apps,dev,health
+                         Available: baseline,power,fingerprint,desktop,network,docker,apps,dev,health
   -h, --help            Show this help.
 
 T480 fingerprint BIOS prerequisite:
@@ -93,6 +98,7 @@ Standalone modules:
   sudo ./scripts/fingerprint.sh
   sudo ./scripts/docker.sh
   sudo ./scripts/dev.sh
+  sudo ./scripts/network.sh
   sudo ./scripts/power.sh --dry-run
 EOF
 }
@@ -173,6 +179,7 @@ run_module_by_id() {
     power) run_power_module ;;
     fingerprint) run_fingerprint_module ;;
     desktop) run_desktop_module ;;
+    network) run_network_module ;;
     docker) run_docker_module ;;
     apps) run_apps_module ;;
     dev) run_dev_module ;;
