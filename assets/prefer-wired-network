@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -uo pipefail
+
+WIRED_IF="${PREFER_WIRED_IF:-}"
+WIFI_IF="${PREFER_WIFI_IF:-}"
+WIFI_CONN="${PREFER_WIFI_CONN:-}"
+INTERVAL_SECONDS="${PREFER_WIRED_INTERVAL_SECONDS:-5}"
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/prefer-wired-network"
+DISABLED_MARKER="$STATE_DIR/wifi-disabled-by-service"
+LOG_TAG="prefer-wired-network"
+
+log() {
+  /usr/bin/logger -t "$LOG_TAG" "$*"
+}
+
+device_state() {
+  /usr/bin/nmcli -t -f DEVICE,TYPE,STATE device status |
+    /usr/bin/awk -F: -v dev="$1" '$1 == dev { print $3; exit }'
+}
+
+wifi_radio_state() {
+  /usr/bin/nmcli -t radio wifi 2>/dev/null || printf 'unknown\n'
+}
+
+bring_wifi_up() {
+  /usr/bin/nmcli radio wifi on || {
+    log "Failed to enable Wi-Fi radio"
+    return 1
+  }
+
+  sleep 2
+
+  if [[ -n "$WIFI_CONN" ]]; then
+    /usr/bin/nmcli connection up id "$WIFI_CONN" ifname "$WIFI_IF" >/dev/null 2>&1 ||
+      /usr/bin/nmcli device connect "$WIFI_IF" >/dev/null 2>&1 ||
+      true
+  else
+    /usr/bin/nmcli device connect "$WIFI_IF" >/dev/null 2>&1 || true
+  fi
+}
+
+reconcile() {
+  local wired_state wifi_radio
+  wired_state="$(device_state "$WIRED_IF")"
+  wifi_radio="$(wifi_radio_state)"
+
+  if [[ "$wired_state" == "connected" ]]; then
+    if [[ "$wifi_radio" == "enabled" ]]; then
+      mkdir -p "$STATE_DIR"
+      touch "$DISABLED_MARKER"
+      log "Ethernet $WIRED_IF is connected; disabling Wi-Fi $WIFI_IF"
+      /usr/bin/nmcli radio wifi off || log "Failed to disable Wi-Fi radio"
+    fi
+    return
+  fi
+
+  if [[ -f "$DISABLED_MARKER" ]]; then
+    log "Ethernet $WIRED_IF is not connected; enabling Wi-Fi $WIFI_IF"
+    bring_wifi_up
+    rm -f "$DISABLED_MARKER"
+  fi
+}
+
+if [[ -z "$WIRED_IF" || -z "$WIFI_IF" ]]; then
+  log "Missing PREFER_WIRED_IF or PREFER_WIFI_IF"
+  exit 2
+fi
+
+log "Starting; wired=$WIRED_IF wifi=$WIFI_IF wifi_conn=${WIFI_CONN:-auto} interval=${INTERVAL_SECONDS}s"
+reconcile
+
+while sleep "$INTERVAL_SECONDS"; do
+  reconcile
+done
