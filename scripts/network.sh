@@ -12,7 +12,6 @@ fi
 : "${PREFER_WIRED_IF:=}"
 : "${PREFER_WIFI_IF:=}"
 : "${PREFER_WIRED_CONN:=}"
-: "${PREFER_WIFI_CONN:=}"
 
 systemd_env_value() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
@@ -46,7 +45,6 @@ install_prefer_wired_service() {
   local env_file
   local wired_conn
   local wired_if
-  local wifi_conn
   local wifi_if
   local user_bin
   local user_unit
@@ -56,12 +54,12 @@ install_prefer_wired_service() {
     return 1
   fi
 
-  if ! confirm "Install user service that disables Wi-Fi while Ethernet is connected?"; then
+  if ! confirm "Install wired-over-Wi-Fi handling (system ARP settings and user service)?"; then
     log "Network preference service skipped."
     return 0
   fi
 
-  section "Installing wired-over-Wi-Fi preference service"
+  section "Installing wired-over-Wi-Fi network handling"
   user_bin="$REAL_HOME/.local/bin/prefer-wired-network"
   user_unit="$REAL_HOME/.config/systemd/user/prefer-wired-network.service"
   env_file="$REAL_HOME/.config/prefer-wired-network.env"
@@ -69,13 +67,17 @@ install_prefer_wired_service() {
   wired_if="${PREFER_WIRED_IF:-$(first_connected_device_by_type ethernet)}"
   wired_if="${wired_if:-$(first_device_by_type ethernet)}"
   wifi_if="${PREFER_WIFI_IF:-$(first_device_by_type wifi)}"
-  wifi_conn="${PREFER_WIFI_CONN:-$(first_connection_by_type 802-11-wireless)}"
 
   if [ -z "$wired_if" ] || [ -z "$wifi_if" ]; then
     log "Could not detect both wired and Wi-Fi devices."
     log "Override with PREFER_WIRED_IF and PREFER_WIFI_IF."
     return 1
   fi
+
+  run install -D -m 0644 \
+    "$PROJECT_DIR/assets/prefer-wired-arp.conf" \
+    /etc/sysctl.d/90-prefer-wired-arp.conf
+  run sysctl --load=/etc/sysctl.d/90-prefer-wired-arp.conf
 
   run install -D -m 0755 "$PROJECT_DIR/assets/prefer-wired-network" "$user_bin"
   run install -D -m 0644 "$PROJECT_DIR/assets/prefer-wired-network.service" "$user_unit"
@@ -88,7 +90,6 @@ install_prefer_wired_service() {
     {
       printf 'PREFER_WIRED_IF="%s"\n' "$(systemd_env_value "$wired_if")"
       printf 'PREFER_WIFI_IF="%s"\n' "$(systemd_env_value "$wifi_if")"
-      printf 'PREFER_WIFI_CONN="%s"\n' "$(systemd_env_value "$wifi_conn")"
     } > "$env_file"
     chown "$REAL_USER:" "$env_file"
     chmod 0600 "$env_file"
@@ -104,16 +105,6 @@ install_prefer_wired_service() {
       ipv6.route-metric 100
   else
     log "Wired connection profile not found for device: $wired_if"
-  fi
-
-  if [ -n "$wifi_conn" ] && connection_exists "$wifi_conn"; then
-    run nmcli connection modify "$wifi_conn" \
-      connection.autoconnect yes \
-      connection.autoconnect-priority 0 \
-      ipv4.route-metric 600 \
-      ipv6.route-metric 600
-  else
-    log "Wi-Fi connection profile not found; Wi-Fi will use device autoconnect."
   fi
 
   run_as_real_user systemctl --user daemon-reload

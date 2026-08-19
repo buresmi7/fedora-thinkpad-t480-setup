@@ -3,7 +3,6 @@ set -uo pipefail
 
 WIRED_IF="${PREFER_WIRED_IF:-}"
 WIFI_IF="${PREFER_WIFI_IF:-}"
-WIFI_CONN="${PREFER_WIFI_CONN:-}"
 INTERVAL_SECONDS="${PREFER_WIRED_INTERVAL_SECONDS:-5}"
 STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/prefer-wired-network"
 DISABLED_MARKER="$STATE_DIR/wifi-disabled-by-service"
@@ -27,16 +26,6 @@ bring_wifi_up() {
     log "Failed to enable Wi-Fi radio"
     return 1
   }
-
-  sleep 2
-
-  if [[ -n "$WIFI_CONN" ]]; then
-    /usr/bin/nmcli connection up id "$WIFI_CONN" ifname "$WIFI_IF" >/dev/null 2>&1 ||
-      /usr/bin/nmcli device connect "$WIFI_IF" >/dev/null 2>&1 ||
-      true
-  else
-    /usr/bin/nmcli device connect "$WIFI_IF" >/dev/null 2>&1 || true
-  fi
 }
 
 reconcile() {
@@ -66,7 +55,7 @@ if [[ -z "$WIRED_IF" || -z "$WIFI_IF" ]]; then
   exit 2
 fi
 
-log "Starting; wired=$WIRED_IF wifi=$WIFI_IF wifi_conn=${WIFI_CONN:-auto} interval=${INTERVAL_SECONDS}s"
+log "Starting; wired=$WIRED_IF wifi=$WIFI_IF wifi_conn=auto interval=${INTERVAL_SECONDS}s"
 reconcile
 
 while sleep "$INTERVAL_SECONDS"; do

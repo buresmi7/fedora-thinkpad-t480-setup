@@ -77,9 +77,10 @@ If the Freon temperature indicator does not appear immediately, log out and back
 - `lib/common.sh` - shared shell helpers.
 - `assets/t480-fingerprint-resume` - systemd sleep hook template installed by `scripts/fingerprint.sh`.
 - `assets/prefer-wired-network*` - user service files installed by `scripts/network.sh`.
+- `assets/prefer-wired-arp.conf` - ARP hardening installed by `scripts/network.sh`.
 
 The fingerprint suspend/resume hook is not meant to be run manually. It is copied to `/usr/lib/systemd/system-sleep/t480-fingerprint-resume`.
 
 ## Network Note
 
-On systems where Ethernet and Wi-Fi are connected to the same LAN, NetworkManager can report address conflicts and long-lived SSH/Git sessions can stall or time out. The `network` module installs a user systemd service that prefers the detected wired Ethernet device and turns Wi-Fi back on only when the cable is disconnected.
+On systems where Ethernet and Wi-Fi are connected to the same LAN, NetworkManager can report address conflicts and long-lived SSH/Git sessions can stall or time out. The `network` module installs host-wide ARP settings that keep each interface's ARP identity scoped to that interface while preserving normal duplicate-address detection. It also installs a user systemd service that prefers the detected wired Ethernet device and turns Wi-Fi back on only when the cable is disconnected. When Wi-Fi is restored, NetworkManager selects the best available saved profile by its normal autoconnect priority instead of forcing a specific SSID.
