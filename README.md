@@ -31,6 +31,11 @@ Zed is installed for the target desktop user with the official Linux installer f
 
 AWS CLI v2 is installed or updated from the official AWS Linux ZIP installer.
 
+## Notes
+
+- Slack is forced through XWayland with a per-user `slack.desktop` override using `Exec=/usr/bin/slack --ozone-platform=x11 %U`. Native Wayland Slack receives GNOME notification clicks, but it does not reliably raise the already-running window, so notification click-through depends on this launcher tweak.
+- Use Google Chrome for Google Meet. Firefox does not provide hardware encoding for the outgoing Meet stream on this setup, which makes Chrome the better choice for calls.
+
 ## Usage
 
 Run the interactive wrapper:
