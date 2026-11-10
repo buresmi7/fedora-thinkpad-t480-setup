@@ -82,7 +82,9 @@ setup_fingerprint_auth() {
   section "Fingerprint authentication"
   log "Fingerprint setup is based on: https://gist.github.com/borcean/f32c47f6cc52cee33dfc2265ce63f777"
 
-  run dnf install -y authselect fprintd fprintd-pam usbutils
+  # Select the driver before installing PAM packages: stock fprintd conflicts
+  # with open-fprintd and must not replace a working python3-validity setup.
+  run dnf install -y authselect usbutils
   log "Fingerprint USB detection:"
   fp_lines="$(fingerprint_usb_lines)"
   log "${fp_lines:-No fingerprint-like USB device detected by lsusb grep.}"
@@ -92,13 +94,24 @@ setup_fingerprint_auth() {
     log "Stock fprintd support may be insufficient; open-fprintd/python3-validity is a community workaround."
     if confirm "Enable COPR $PYTHON_VALIDITY_COPR and install open-fprintd/python3-validity?"; then
       run dnf copr enable -y "$PYTHON_VALIDITY_COPR"
-      run dnf install -y open-fprintd fprintd-clients fprintd-clients-pam python3-validity
+      if ! run dnf install -y open-fprintd fprintd-clients fprintd-clients-pam python3-validity; then
+        log "Could not install a compatible fingerprint driver."
+        log "For Fedora 45 / Python 3.15, see $PROJECT_DIR/docs/fedora-45-upgrade.md."
+        return 1
+      fi
       run_tolerate systemctl disable --now fprintd
       run systemctl enable --now open-fprintd python3-validity
       prepare_validity_fingerprint_reader
     else
-      log "COPR/open-fprintd setup skipped."
+      log "COPR/open-fprintd setup skipped; existing fingerprint configuration left in place."
+      return 0
     fi
+  else
+    run dnf install -y fprintd fprintd-pam
+  fi
+
+  if [ "$FEDORA_VERSION" -eq 45 ]; then
+    log "GNOME 51 requires a password for a new login; fingerprints remain available for screen unlock."
   fi
 
   run authselect enable-feature with-fingerprint

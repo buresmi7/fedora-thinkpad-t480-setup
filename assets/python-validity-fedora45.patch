@@ -1,0 +1,14 @@
+--- python-validity.spec
++++ python-validity.spec
+@@ -9,3 +9,3 @@
+ Version:        0.15
+-Release:        1%{?dist}
++Release:        1%{?dist}.local1
+ Summary:        Validity fingerprint sensor driver
+@@ -121,3 +121,6 @@
+ %changelog
++* Tue Nov 10 2026 Local rebuild - 0.15-1.fc45.local1
++- Rebuild existing verified source package for Fedora 45 and Python 3.15.
++
+ * Thu Jun 12 2025 Ruben R. <sneexy@amogus.cloud> - 0.15-1
+ - Bump to python-validity 0.15

@@ -135,7 +135,7 @@ baseurl=https://packagecloud.io/slacktechnologies/slack/fedora/21/$basearch
 enabled=1
 gpgcheck=1
 repo_gpgcheck=0
-gpgkey=https://slack.com/gpg/slack_pubkey_20251016.gpg
+gpgkey=https://slack.com/gpg/slack_pubkey_20260921.gpg
 sslverify=1
 metadata_expire=300
 EOF
@@ -148,7 +148,7 @@ install_slack() {
     return 0
   fi
 
-  run rpm --import https://slack.com/gpg/slack_pubkey_20251016.gpg
+  run rpm --import https://slack.com/gpg/slack_pubkey_20260921.gpg
   write_slack_repo
   run dnf makecache -y --disablerepo='*' --enablerepo=slack
   run dnf install -y slack

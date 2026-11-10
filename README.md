@@ -2,6 +2,8 @@
 
 Modular Fedora post-install setup for Lenovo ThinkPad T480.
 
+The Fedora 44 to 45 upgrade was verified with the Synaptics `06cb:009a` reader, Python 3.15, and a locally rebuilt `python3-validity` package. See [Fedora 45 upgrade notes](docs/fedora-45-upgrade.md) for the build, upgrade procedure, and fingerprint login behavior in GNOME 51.
+
 ## Features
 
 - Baseline Fedora tools and ThinkPad diagnostics.
@@ -83,6 +85,8 @@ If the Freon temperature indicator does not appear immediately, log out and back
 - `assets/t480-fingerprint-resume` - systemd sleep hook template installed by `scripts/fingerprint.sh`.
 - `assets/prefer-wired-network*` - user service files installed by `scripts/network.sh`.
 - `assets/prefer-wired-arp.conf` - ARP hardening installed by `scripts/network.sh`.
+- `assets/python-validity-fedora45.patch` - RPM release adjustment for the verified Fedora 45 fingerprint driver rebuild.
+- `docs/fedora-45-upgrade.md` - Fedora 45 migration and fingerprint compatibility notes.
 
 The fingerprint suspend/resume hook is not meant to be run manually. It is copied to `/usr/lib/systemd/system-sleep/t480-fingerprint-resume`.
 

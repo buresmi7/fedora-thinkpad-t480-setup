@@ -1,0 +1,6 @@
+/build/
+*.rpm
+/.local-sensitive-context.md
+/.env
+/.env.*
+!/.env.example

@@ -15,6 +15,8 @@ print_health_report() {
   run_tolerate fwupdmgr get-devices
   run_tolerate bash -c 'upower -e | grep -i battery | while read -r bat; do echo "--- ${bat}"; upower -i "${bat}"; done'
   run_tolerate bash -c "lsusb | grep -Ei 'finger|synaptics|06cb:009a'"
+  run_tolerate authselect check
+  run_tolerate rpm -q gdm python3-validity open-fprintd fprintd-clients-pam
   run_tolerate sensors
   run_tolerate vainfo
   run_tolerate tuned-adm active
@@ -42,6 +44,10 @@ print_manual_followup() {
   log "If fingerprint enrollment was skipped or failed, run as the target user: fprintd-enroll"
   log "Fingerprint resume hook logs: journalctl -b -t t480-fingerprint-resume"
   log "Fingerprint service logs: journalctl -b -u open-fprintd -u python3-validity"
+  if [ "$FEDORA_VERSION" -eq 45 ]; then
+    log "GNOME 51: use a password for a new login after boot or logout; use a fingerprint to unlock an existing session."
+    log "Fedora 45 fingerprint compatibility and upgrade notes: $PROJECT_DIR/docs/fedora-45-upgrade.md"
+  fi
   log "Rootless Docker user service logs as the target user: journalctl --user -u docker.service"
   log "Rootless Docker socket for IDEs/tools: unix:///run/user/${docker_uid}/docker.sock"
   log "Risky throttling fixes were not installed automatically. Review such changes manually before applying them."
