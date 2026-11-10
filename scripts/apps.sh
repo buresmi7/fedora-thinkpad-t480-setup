@@ -91,6 +91,35 @@ install_google_chrome() {
   run_tolerate command -v google-chrome-stable
 }
 
+configure_slack_xwayland_launcher() {
+  local desktop_dir
+  local desktop_file
+
+  if [ -z "$REAL_USER" ] || [ -z "$REAL_HOME" ]; then
+    log "No target desktop user detected; skipping Slack launcher override."
+    return 0
+  fi
+
+  desktop_dir="$REAL_HOME/.local/share/applications"
+  desktop_file="$desktop_dir/slack.desktop"
+
+  if [ "$DRY_RUN" -eq 1 ]; then
+    log "Dry-run: would create Slack launcher override at $desktop_file"
+    log "Dry-run: would force Slack through XWayland with --ozone-platform=x11"
+    return 0
+  fi
+
+  # Slack/Electron receives GNOME notification clicks on Wayland, but raising an
+  # already-running window is unreliable without a fresh activation token.
+  # Forcing XWayland keeps Slack notification click-through usable.
+  run install -d -m 0755 -o "$REAL_USER" -g "$REAL_USER" "$desktop_dir"
+  run cp /usr/share/applications/slack.desktop "$desktop_file"
+  run sed -i 's|^Exec=.*$|Exec=/usr/bin/slack --ozone-platform=x11 %U|' "$desktop_file"
+  run chown "$REAL_USER:$REAL_USER" "$desktop_file"
+  run chmod 0644 "$desktop_file"
+  run_as_real_user update-desktop-database "$desktop_dir"
+}
+
 write_slack_repo() {
   local path="/etc/yum.repos.d/slack.repo"
 
@@ -125,6 +154,7 @@ install_slack() {
   run dnf install -y slack
   run_tolerate rpm -q slack
   run_tolerate command -v slack
+  configure_slack_xwayland_launcher
 }
 
 run_apps_module() {
