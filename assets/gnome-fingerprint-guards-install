@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+# Persistent per-user installation. Never restart GNOME or touch PAM/the reader.
+set -euo pipefail
+umask 077
+
+[[ $EUID -ne 0 ]] || { echo 'Run as the desktop user, without sudo.' >&2; exit 1; }
+action=${1:-enable}
+[[ $# -le 1 && $action =~ ^(enable|disable|status)$ ]] || {
+    echo "Usage: bash $0 [enable|disable|status]" >&2
+    exit 2
+}
+desktop_home=$(getent passwd "$(id -u)" | cut -d: -f6)
+[[ -n $desktop_home && $desktop_home != / && -d $desktop_home && -O $desktop_home ]]
+[[ -z ${XDG_CONFIG_HOME:-} || ${XDG_CONFIG_HOME} == "$desktop_home/.config" ]] || {
+    echo 'A custom XDG_CONFIG_HOME needs a separately reviewed installation.' >&2
+    exit 1
+}
+runtime_dir=$(loginctl show-user "$(id -un)" --property=RuntimePath --value)
+[[ -d $runtime_dir && ! -L $runtime_dir && -O $runtime_dir ]]
+assets_dir=$(cd -- "$(dirname -- "$0")" && pwd -P)
+install_dir=$desktop_home/.local/libexec/t480-gnome-fingerprint
+config_dir=$desktop_home/.config/systemd/user/org.gnome.Shell@user.service.d
+dropin=$config_dir/90-t480-fingerprint-guards.conf
+trial_dropin=$runtime_dir/systemd/user/org.gnome.Shell@user.service.d/90-t480-fingerprint-guards.conf
+backup_base=$desktop_home/.local/state/fedora-t480-setup/gnome-fingerprint-backups
+dropin_hash=6c3efcc3bfeafb04070a93fb77ace7190195bf78a0fcd76f92fbfd73463f4a1c
+trial_hash=cecca52cc3c5298b33050d43b58d1b26ec61bf50c1944cb42398270e5dfbe79c
+helper_hash=0621d1951932d4f16c1bb557f4447039d384ebac842f3d6495d2034114ee1416
+
+validate_file() {
+    local path=$1 expected=$2
+    if [[ -e $path || -L $path ]]; then
+        [[ -f $path && ! -L $path && -O $path ]] || {
+            echo "Unsafe file target; refusing to change: $path" >&2
+            exit 1
+        }
+        [[ $(sha256sum "$path" | cut -d ' ' -f 1) == "$expected" ]] || {
+            echo "File differs from the reviewed configuration; left unchanged: $path" >&2
+            exit 1
+        }
+    fi
+}
+
+if [[ $action == status ]]; then
+    if [[ -f $dropin ]]; then
+        validate_file "$dropin" "$dropin_hash"
+        echo "Persistent workaround configured: $dropin"
+    else
+        echo 'Persistent workaround is not configured.'
+    fi
+    systemctl --user show org.gnome.Shell@user.service --property=ActiveState,MainPID,DropInPaths
+    exit 0
+fi
+
+validate_file "$dropin" "$dropin_hash"
+validate_file "$trial_dropin" "$trial_hash"
+[[ ! -L $install_dir && ! -L $config_dir && ! -L $backup_base ]]
+shell_pid=$(systemctl --user show org.gnome.Shell@user.service --property=MainPID --value)
+
+if [[ $action == disable && ! -e $dropin && ! -e $trial_dropin ]]; then
+    echo 'Workaround already disabled. No files changed.'
+    exit 0
+fi
+
+if [[ $action == enable ]]; then
+    if systemctl --user show-environment | rg '^G_RESOURCE_OVERLAYS=' >/dev/null; then
+        echo 'A manager-wide resource overlay is configured; refusing to replace it.' >&2
+        exit 1
+    fi
+    if ! systemctl --user show org.gnome.Shell@user.service --property=Environment --value |
+        /usr/bin/python3 -c 'import shlex,sys; values=[x for x in shlex.split(sys.stdin.read()) if x.startswith("G_RESOURCE_OVERLAYS=")]; sys.exit(any(x not in sys.argv[1:] for x in values))' \
+        "G_RESOURCE_OVERLAYS=/org/gnome/shell/gdm/authServicesLegacy.js=$runtime_dir/t480-gnome-fingerprint-trial/authServicesLegacy.js" \
+        "G_RESOURCE_OVERLAYS=/org/gnome/shell/gdm/authServicesLegacy.js=$runtime_dir/t480-gnome-fingerprint/authServicesLegacy.js"; then
+        echo 'A different GNOME resource overlay is configured; refusing to replace it.' >&2
+        exit 1
+    fi
+    [[ $(sha256sum "$assets_dir/gnome-fingerprint-guards.py" | cut -d ' ' -f 1) == "$helper_hash" ]]
+    [[ $(sha256sum "$assets_dir/gnome-fingerprint-guards-persistent.conf" | cut -d ' ' -f 1) == "$dropin_hash" ]]
+    command -v node >/dev/null
+    # Refuse to overwrite separately edited installed files.
+    for pair in 'gnome-fingerprint-guards.py:gnome-fingerprint-guards.py' 'gnome-fingerprint-guards-persistent.conf:gnome-fingerprint-guards-persistent.conf'; do
+        source_name=${pair%%:*}
+        target_name=${pair#*:}
+        if [[ -e $install_dir/$target_name || -L $install_dir/$target_name ]]; then
+            [[ -f $install_dir/$target_name && ! -L $install_dir/$target_name && -O $install_dir/$target_name ]]
+            cmp -s "$assets_dir/$source_name" "$install_dir/$target_name" || {
+                echo 'Installed helper/template was changed; refusing to overwrite it.' >&2
+                exit 1
+            }
+        fi
+    done
+    if [[ -e $install_dir/manage.sh || -L $install_dir/manage.sh ]]; then
+        [[ -f $install_dir/manage.sh && ! -L $install_dir/manage.sh && -O $install_dir/manage.sh ]]
+        cmp -s "$0" "$install_dir/manage.sh" || {
+            echo 'Installed manager was changed; refusing to overwrite it.' >&2
+            exit 1
+        }
+    fi
+fi
+
+install -d -m 0700 "$backup_base"
+backup_dir=$(mktemp -d "$backup_base/change.XXXXXXXX")
+had_persistent=0
+had_trial=0
+if [[ -f $dropin ]]; then
+    install -m 0600 "$dropin" "$backup_dir/persistent.conf.before"
+    had_persistent=1
+fi
+if [[ -f $trial_dropin ]]; then
+    install -m 0600 "$trial_dropin" "$backup_dir/runtime-trial.conf.before"
+    had_trial=1
+fi
+
+changed_persistent=0
+changed_trial=0
+rollback() {
+    result=$?
+    trap - EXIT
+    if (( result != 0 )); then
+        if (( changed_persistent )); then
+            if (( had_persistent )); then
+                install -m 0644 "$backup_dir/persistent.conf.before" "$dropin" || true
+            elif [[ -f $dropin && ! -L $dropin ]] && [[ $(sha256sum "$dropin" | cut -d ' ' -f 1) == "$dropin_hash" ]]; then
+                unlink "$dropin" || true
+            fi
+        fi
+        if (( changed_trial && had_trial )); then
+            install -m 0644 "$backup_dir/runtime-trial.conf.before" "$trial_dropin" || true
+        fi
+        systemctl --user daemon-reload || true
+        echo "Installation did not finish; previous overrides restored. Backup: $backup_dir" >&2
+    fi
+    exit "$result"
+}
+trap rollback EXIT
+
+if [[ $action == enable ]]; then
+    install -d -m 0700 "$backup_dir/preflight"
+    /usr/bin/env -u G_RESOURCE_OVERLAYS /usr/bin/python3 -I "$assets_dir/gnome-fingerprint-guards.py" --directory "$backup_dir/preflight"
+    [[ -s $backup_dir/preflight/authServicesLegacy.js ]]
+    node --check --input-type=module < "$backup_dir/preflight/authServicesLegacy.js"
+    install -d -m 0700 "$install_dir"
+    for name in gnome-fingerprint-guards.py gnome-fingerprint-guards-persistent.conf; do
+        if ! cmp -s "$assets_dir/$name" "$install_dir/$name"; then
+            install -m 0600 "$assets_dir/$name" "$install_dir/$name"
+        fi
+    done
+    if ! cmp -s "$0" "$install_dir/manage.sh"; then
+        install -m 0700 "$0" "$install_dir/manage.sh"
+    fi
+    install -d -m 0755 "$config_dir"
+    # Stage next to the target so the final replacement is atomic.
+    staged_dropin=$(mktemp "$config_dir/.t480-fingerprint.XXXXXXXX")
+    install -m 0644 "$assets_dir/gnome-fingerprint-guards-persistent.conf" "$staged_dropin"
+    mv -T "$staged_dropin" "$dropin"
+    changed_persistent=1
+else
+    if (( had_persistent )); then
+        mv -T "$dropin" "$backup_dir/persistent.conf.disabled"
+        changed_persistent=1
+    fi
+fi
+if (( had_trial )); then
+    mv -T "$trial_dropin" "$backup_dir/runtime-trial.conf.disabled"
+    changed_trial=1
+fi
+systemctl --user daemon-reload
+[[ $(systemctl --user show org.gnome.Shell@user.service --property=MainPID --value) == "$shell_pid" ]]
+trap - EXIT
+echo "Workaround $action completed; GNOME was not restarted. Backup: $backup_dir"
+if [[ $action == enable ]]; then
+    echo 'Configuration and helper now survive reboot; output is regenerated at each GNOME start.'
+    echo "Rollback: bash $install_dir/manage.sh disable"
+else
+    echo 'The next login uses packaged GNOME code. Installed helpers and backups are retained.'
+fi
+echo 'No changes to GDM greeter, PAM, fingerprint driver, calibration, enrollment, or 1Password.'

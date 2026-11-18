@@ -1,0 +1,201 @@
+--- a/dbus_service/dbus-service
++++ b/dbus_service/dbus-service
+@@ -12,7 +12,7 @@
+ import typing
+ from binascii import hexlify, unhexlify
+ from pathlib import Path
+-from threading import Thread
++from threading import Event, Thread
+ 
+ import dbus
+ import dbus.mainloop.glib
+@@ -27,7 +27,7 @@
+ from validitysensor.sensor import sensor, RebootException
+ from validitysensor.sid import sid_from_string
+ from validitysensor.tls import tls
+-from validitysensor.usb import usb
++from validitysensor.usb import usb, CancelledException
+ from validitysensor.fingerprint_constants import finger_ids
+ 
+ dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+@@ -45,10 +45,41 @@
+         super().__init__('No enrolled prints found')
+ 
+ 
++class OperationStillRunning(dbus.DBusException):
++    _dbus_error_name = 'net.reactivated.Fprint.Error.AlreadyInUse'
++
++    def __init__(self):
++        super().__init__('Previous fingerprint operation has not stopped')
++
++
+ class Device(dbus.service.Object):
++    STOP_TIMEOUT = 3.0
++
+     def __init__(self, bus_name: dbus.Bus, config: typing.Dict[str, typing.Any]):
+         dbus.service.Object.__init__(self, bus_name, '/io/github/uunicorn/Fprint/Device')
+         self.config = config
++        self._worker = None
++        self._cancelled = Event()
++
++    def _stop_operation(self):
++        self._cancelled.set()
++        sensor.cancel()
++        if self._worker is not None:
++            self._worker.join(self.STOP_TIMEOUT)
++            if self._worker.is_alive():
++                logging.warning('Fingerprint operation did not stop within %.1f seconds', self.STOP_TIMEOUT)
++                raise OperationStillRunning()
++            self._worker = None
++
++    def _prepare_operation(self):
++        self._stop_operation()
++        # Never clear cancellation while the previous worker can still read USB.
++        self._cancelled = Event()
++        usb.cancel = False
++
++    def _start_worker(self, target):
++        self._worker = Thread(target=target, daemon=True)
++        self._worker.start()
+ 
+     def user2identity(self, user: str) -> SidIdentity:
+         """Compute UID to SID mapping"""
+@@ -67,10 +98,12 @@
+     @dbus.service.method(dbus_interface=INTERFACE_NAME, in_signature='', out_signature='')
+     def Suspend(self):
+         logging.debug('In Suspend')
++        self._stop_operation()
+ 
+     @dbus.service.method(dbus_interface=INTERFACE_NAME, in_signature='', out_signature='')
+     def Resume(self):
+         logging.debug('In Resume')
++        self._prepare_operation()
+         tls.reset()
+         try:
+             init.open_common()
+@@ -106,6 +139,8 @@
+     @dbus.service.method(dbus_interface=INTERFACE_NAME, in_signature='ss', out_signature='')
+     def VerifyStart(self, user, finger):
+         logging.debug('In VerifyStart for %s, %s' % (user, finger))
++        self._prepare_operation()
++        cancelled = self._cancelled
+ 
+         usr = self.user2record(user)
+ 
+@@ -115,40 +150,49 @@
+         self.VerifyFingerSelected('any')
+ 
+         def update_cb(e):
+-            self.VerifyStatus('verify-retry-scan', False)
++            if not cancelled.is_set():
++                self.VerifyStatus('verify-retry-scan', False)
+ 
+         def run():
+             try:
+                 # TODO: pass down the user db record id and implement a proper Sensor.verify() method
+                 usrid, subtype, hsh = sensor.identify(update_cb)
++                if cancelled.is_set():
++                    return
+                 if usr.dbid == usrid:
+                     self.VerifyStatus('verify-match', True)
+                 else:
+                     self.VerifyStatus('verify-no-match', True)
++            except CancelledException:
++                pass
+             except usb_core.USBError as e:
+                 logging.exception(e)
+-                self.VerifyStatus('verify-no-match', True)
++                if not cancelled.is_set():
++                    self.VerifyStatus('verify-no-match', True)
+                 loop.quit()
+             except Exception as e:
+                 logging.exception(e)
+-                self.VerifyStatus('verify-no-match', True)
++                if not cancelled.is_set():
++                    self.VerifyStatus('verify-no-match', True)
+ 
+-        thread = Thread(target=run)
+-        thread.daemon = True
+-        thread.start()
++        self._start_worker(run)
+ 
+     @dbus.service.method(dbus_interface=INTERFACE_NAME, in_signature='', out_signature='')
+     def Cancel(self):
+-        sensor.cancel()
++        self._stop_operation()
+ 
+     @dbus.service.method(dbus_interface=INTERFACE_NAME, in_signature='ss', out_signature='')
+     def EnrollStart(self, user, finger_name):
+         logging.debug('In EnrollStart %s for %s' % (finger_name, user))
++        self._prepare_operation()
++        cancelled = self._cancelled
+ 
+         usr = self.user2identity(user)
+         index = finger_ids.get(finger_name, None)
+ 
+         def update_cb(rsp, e):
++            if cancelled.is_set():
++                return
+             if e is not None:
+                 self.EnrollStatus('enroll-retry-scan', False)
+             else:
+@@ -157,23 +201,26 @@
+         def run():
+             try:
+                 sensor.enroll(usr, index, update_cb)
+-                self.EnrollStatus('enroll-completed', True)
++                if not cancelled.is_set():
++                    self.EnrollStatus('enroll-completed', True)
++            except CancelledException:
++                pass
+             except usb_core.USBError as e:
+                 logging.exception(e)
+-                self.EnrollStatus('enroll-failed', True)
++                if not cancelled.is_set():
++                    self.EnrollStatus('enroll-failed', True)
+                 loop.quit()
+             except Exception as e:
+                 logging.exception(e)
+-                self.EnrollStatus('enroll-failed', True)
++                if not cancelled.is_set():
++                    self.EnrollStatus('enroll-failed', True)
+ 
+         if index is None:
+             logging.exception('Unknown finger name passed to enroll? ' + finger_name + ' (' +
+                               winbio_name + ')')
+             self.EnrollStatus('enroll-failed', True)
+         else:
+-            thread = Thread(target=run)
+-            thread.daemon = True
+-            thread.start()
++            self._start_worker(run)
+ 
+     @dbus.service.signal(dbus_interface=INTERFACE_NAME, signature='sb')
+     def VerifyStatus(self, result, done):
+@@ -190,6 +237,7 @@
+     @dbus.service.method(dbus_interface=INTERFACE_NAME, in_signature='s', out_signature='s')
+     def RunCmd(self, cmd):
+         logging.debug('RunCmd')
++        self._prepare_operation()
+         return hexlify(tls.app(unhexlify(cmd))).decode()
+ 
+ 
+--- a/validitysensor/usb.py
++++ b/validitysensor/usb.py
+@@ -123,11 +123,14 @@
+         self.cancel = True
+ 
+     def wait_int(self):
+-        self.cancel = False
+-
+         while True:
++            # Cancellation belongs to the whole operation, not one USB read.
++            if self.cancel:
++                raise CancelledException()
+             try:
+                 resp = self.dev.read(131, 1024, timeout=100)
++                if self.cancel:
++                    raise CancelledException()
+                 resp = bytes(resp)
+                 self.trace('<int< %s' % hexlify(resp).decode())
+                 return resp

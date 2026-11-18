@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Per-user, runtime-only trial. Never restart GNOME or change PAM/the driver.
+set -euo pipefail
+umask 077
+
+[[ $EUID -ne 0 ]] || { echo 'Run as the desktop user, without sudo.' >&2; exit 1; }
+runtime_dir=/run/user/$(id -u)
+trial_dir=$runtime_dir/t480-gnome-fingerprint-trial
+dropin_dir=$runtime_dir/systemd/user/org.gnome.Shell@user.service.d
+dropin=$dropin_dir/90-t480-fingerprint-guards.conf
+dropin_hash=cecca52cc3c5298b33050d43b58d1b26ec61bf50c1944cb42398270e5dfbe79c
+
+if [[ ${1:-enable} == disable ]]; then
+    if [[ -e $dropin || -L $dropin ]]; then
+        [[ -f $dropin && ! -L $dropin ]]
+        [[ $(sha256sum "$dropin" | cut -d ' ' -f 1) == "$dropin_hash" ]] || {
+            echo 'The drop-in was changed by someone else; refusing to remove it.' >&2
+            exit 1
+        }
+        unlink "$dropin"
+        systemctl --user daemon-reload
+    fi
+    echo 'Trial disabled for the next login. The running desktop was not restarted.'
+    echo 'The runtime backup is retained until reboot.'
+    exit 0
+fi
+[[ ${1:-enable} == enable && $# -le 1 ]] || { echo "Usage: bash $0 [enable|disable]" >&2; exit 1; }
+
+assets_dir=$(cd -- "$(dirname -- "$0")" && pwd -P)
+[[ -d $runtime_dir && ! -L $runtime_dir && -O $runtime_dir ]]
+[[ ! -e $trial_dir && ! -L $trial_dir && ! -e $dropin && ! -L $dropin ]]
+[[ ! -L $dropin_dir ]]
+[[ $(loginctl show-user "$(id -un)" --property=Linger --value) == yes ]] || {
+    echo 'A runtime trial would not survive logout without user lingering; no changes made.' >&2
+    exit 1
+}
+systemctl --user is-active --quiet org.gnome.Shell@user.service
+if systemctl --user show-environment | rg '^G_RESOURCE_OVERLAYS=' >/dev/null; then
+    echo 'An existing resource overlay is configured; refusing to replace it.' >&2
+    exit 1
+fi
+[[ $(sha256sum "$assets_dir/gnome-fingerprint-guards.py" | cut -d ' ' -f 1) == 0621d1951932d4f16c1bb557f4447039d384ebac842f3d6495d2034114ee1416 ]]
+[[ $(sha256sum "$assets_dir/gnome-fingerprint-guards.conf" | cut -d ' ' -f 1) == "$dropin_hash" ]]
+command -v node >/dev/null
+shell_pid=$(systemctl --user show org.gnome.Shell@user.service --property=MainPID --value)
+
+install -d -m 0700 "$trial_dir"
+install -m 0700 "$assets_dir/gnome-fingerprint-guards.py" "$trial_dir/prepare.py"
+install -m 0700 "$assets_dir/gnome-fingerprint-guards-trial" "$trial_dir/manage.sh"
+install -m 0600 /usr/lib/systemd/user/org.gnome.Shell@.service "$trial_dir/original-shell-unit.service"
+install -m 0600 /usr/lib64/gnome-shell/libshell-51.so "$trial_dir/libshell-51.so.original"
+/usr/bin/env -u G_RESOURCE_OVERLAYS /usr/bin/python3 -I "$trial_dir/prepare.py" --directory "$trial_dir"
+[[ -s $trial_dir/authServicesLegacy.js ]]
+node --check --input-type=module < "$trial_dir/authServicesLegacy.js"
+
+installed=0
+cleanup() {
+    result=$?
+    trap - EXIT
+    if (( result != 0 && installed )); then
+        /usr/bin/bash "$trial_dir/manage.sh" disable || true
+    fi
+    exit "$result"
+}
+trap cleanup EXIT
+install -d -m 0755 "$dropin_dir"
+install -m 0644 "$assets_dir/gnome-fingerprint-guards.conf" "$dropin"
+installed=1
+systemctl --user daemon-reload
+[[ $(systemctl --user show org.gnome.Shell@user.service --property=MainPID --value) == "$shell_pid" ]]
+trap - EXIT
+echo 'Trial prepared for the next login; the running GNOME process was not restarted.'
+echo 'No GDM greeter, PAM, fingerprint driver, calibration, or enrollment changes made.'
+echo "Runtime-only backup and rollback helper: $trial_dir"
+echo "Rollback: bash $trial_dir/manage.sh disable"
+echo 'Save your work, log out and log in with your password to activate it. Reboot removes the trial.'

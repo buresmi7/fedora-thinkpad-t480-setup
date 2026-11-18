@@ -4,6 +4,8 @@ Modular Fedora post-install setup for Lenovo ThinkPad T480.
 
 The Fedora 44 to 45 upgrade was verified with the Synaptics `06cb:009a` reader, Python 3.15, and a locally rebuilt `python3-validity` package. See [Fedora 45 upgrade notes](docs/fedora-45-upgrade.md) for the build, upgrade procedure, and fingerprint login behavior in GNOME 51.
 
+If the fingerprint reader works in 1Password but GNOME 51 screen unlocking fails, see the verified [permanent per-user GNOME unlock workaround](docs/fedora-45-upgrade.md#permanent-per-user-gnome-unlock-workaround). It prevents the observed double start without changing PAM, enrollment, or password-only initial login.
+
 ## Features
 
 - Baseline Fedora tools and ThinkPad diagnostics.
@@ -69,6 +71,14 @@ sudo ./scripts/network.sh
 sudo ./scripts/health.sh
 ```
 
+Install the optional GNOME 51 unlock workaround as the desktop user, **without sudo**:
+
+```bash
+bash assets/gnome-fingerprint-guards-install enable
+```
+
+This is separate from the root-run modules. See the [guide](docs/fedora-45-upgrade.md#permanent-per-user-gnome-unlock-workaround) for prerequisites, validation, upgrade fallback, and rollback. It does not restart the active desktop.
+
 Re-run only the GNOME desktop setup, including the CPU temperature indicator:
 
 ```bash
@@ -86,6 +96,14 @@ If the Freon temperature indicator does not appear immediately, log out and back
 - `assets/prefer-wired-network*` - user service files installed by `scripts/network.sh`.
 - `assets/prefer-wired-arp.conf` - ARP hardening installed by `scripts/network.sh`.
 - `assets/python-validity-fedora45.patch` - RPM release adjustment for the verified Fedora 45 fingerprint driver rebuild.
+- `assets/python-validity-jon-fedora45.spec` - pinned T480 fork trial with USB recovery and persistent calibration; see the upgrade notes for validation and rollback.
+- `assets/python-validity-cancellation-rpm.patch` / `assets/python-validity-serialize-scans.patch` - experimental cancellation fix, not a confirmed GNOME unlock solution; see the upgrade notes.
+- `tests/test_python_validity_cancellation.py` - hardware-free regression tests for the fingerprint cancellation fix.
+- `assets/gnome-fingerprint-guards-install` / `assets/gnome-fingerprint-guards-persistent.conf` - permanent per-user GNOME 51 unlock workaround, with backup and rollback; not enabled by the root-run setup modules.
+- `assets/gnome-fingerprint-guards.py` - source-checksummed overlay generator that falls back to the packaged GNOME code after an unreviewed update.
+- `assets/gnome-fingerprint-guards-trial` / `assets/gnome-fingerprint-guards.conf` - original runtime-only trial, retained for reproducing the investigation.
+- `tests/test_gnome_fingerprint_guards.py` - hardware-free tests for that GNOME trial; actual screen unlocking must be checked separately.
+- `tests/test_gnome_fingerprint_install.py` - isolated tests of permanent installation, migration, refusal to overwrite unrelated files, and rollback.
 - `docs/fedora-45-upgrade.md` - Fedora 45 migration and fingerprint compatibility notes.
 
 The fingerprint suspend/resume hook is not meant to be run manually. It is copied to `/usr/lib/systemd/system-sleep/t480-fingerprint-resume`.
